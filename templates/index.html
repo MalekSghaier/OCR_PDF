@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>OCR PDF - Extraction intelligente</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at 10% 20%, #1a0b2e 0%, #0f0a1f 50%, #0b0b1a 100%);
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            overflow: hidden;
+        }
+
+        /* Particules animées en arrière-plan */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><circle cx="30" cy="30" r="4" fill="rgba(110, 69, 226, 0.3)"/><circle cx="150" cy="80" r="3" fill="rgba(0, 194, 255, 0.3)"/><circle cx="80" cy="150" r="5" fill="rgba(156, 39, 176, 0.3)"/><circle cx="180" cy="170" r="2" fill="rgba(110, 69, 226, 0.3)"/><circle cx="50" cy="180" r="3" fill="rgba(0, 194, 255, 0.3)"/></svg>');
+            background-size: 300px 300px;
+            animation: float 20s linear infinite;
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        /* Effet de néon tournant */
+        body::after {
+            content: '';
+            position: absolute;
+            width: 150%;
+            height: 150%;
+            background: conic-gradient(from 0deg, #6e45e2, #00c2ff, #9c27b0, #6e45e2);
+            animation: rotate 15s linear infinite;
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-20px) translateX(20px); }
+            100% { transform: translateY(0) translateX(0); }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg) scale(1); }
+            to { transform: rotate(360deg) scale(1.2); }
+        }
+
+        .container {
+            background: rgba(20, 15, 35, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            width: 90vw;
+            max-width: 900px;
+            height: 85vh;
+            padding: 30px 40px;
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(110, 69, 226, 0.3) inset, 0 0 30px rgba(110, 69, 226, 0.3);
+            position: relative;
+            z-index: 1;
+            transform: translateY(0);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(110, 69, 226, 0.3);
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(0, 194, 255, 0.4) inset, 0 0 40px rgba(0, 194, 255, 0.4);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #fff;
+            font-size: 2.4em;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            flex-shrink: 0;
+            text-shadow: 0 0 10px rgba(110, 69, 226, 0.5), 0 0 20px rgba(0, 194, 255, 0.3);
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg, #6e45e2, #00c2ff, #9c27b0);
+            border-radius: 2px;
+            box-shadow: 0 0 15px #6e45e2;
+        }
+
+        form {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .upload-area {
+            background: rgba(110, 69, 226, 0.1);
+            border: 2px dashed rgba(0, 194, 255, 0.5);
+            border-radius: 20px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(110, 69, 226, 0.2);
+        }
+
+        .upload-area:hover {
+            background: rgba(110, 69, 226, 0.2);
+            border-color: #9c27b0;
+            transform: scale(1.02);
+            box-shadow: 0 0 30px rgba(156, 39, 176, 0.4);
+        }
+
+        .upload-area i {
+            font-size: 45px;
+            color: #00c2ff;
+            margin-bottom: 8px;
+            display: inline-block;
+            filter: drop-shadow(0 0 10px #00c2ff);
+        }
+
+        .upload-area p {
+            color: #fff;
+            font-size: 1em;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .upload-area .file-info {
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            background: linear-gradient(135deg, #6e45e2, #00c2ff);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            box-shadow: 0 10px 20px rgba(110, 69, 226, 0.4);
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(0, 194, 255, 0.5);
+            background: linear-gradient(135deg, #00c2ff, #9c27b0);
+        }
+
+        .button-container {
+            text-align: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #6e45e2, #00c2ff, #9c27b0);
+            background-size: 200% 200%;
+            color: white;
+            border: none;
+            padding: 14px 35px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.1em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            box-shadow: 0 10px 20px rgba(110, 69, 226, 0.4), 0 0 20px rgba(0, 194, 255, 0.4);
+            position: relative;
+            overflow: hidden;
+            animation: gradientMove 5s ease infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 20px 30px rgba(156, 39, 176, 0.5), 0 0 30px #00c2ff;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 5px 0;
+            flex-shrink: 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #6e45e2;
+            border-right: 4px solid #00c2ff;
+            border-bottom: 4px solid #9c27b0;
+            border-radius: 50%;
+            animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+            margin: 0 auto 8px;
+            box-shadow: 0 0 20px #6e45e2;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader p {
+            color: #fff;
+            font-size: 0.95em;
+            font-weight: 500;
+            animation: pulse 1.5s ease infinite;
+            text-shadow: 0 0 10px #6e45e2;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .textarea-container {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        textarea {
+            width: 100%;
+            flex: 1;
+            padding: 15px;
+            border-radius: 20px;
+            border: 2px solid rgba(110, 69, 226, 0.3);
+            resize: none;
+            font-size: 14px;
+            line-height: 1.6;
+            font-family: 'Segoe UI', monospace;
+            transition: all 0.3s ease;
+            background: rgba(10, 8, 20, 0.8);
+            color: #fff;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(110, 69, 226, 0.2);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #00c2ff;
+            box-shadow: 0 0 0 4px rgba(0, 194, 255, 0.1), inset 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 30px #6e45e2;
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+            font-style: italic;
+        }
+
+        .char-count {
+            position: absolute;
+            bottom: 12px;
+            right: 15px;
+            background: rgba(110, 69, 226, 0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            color: #00c2ff;
+            font-weight: 500;
+            pointer-events: none;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0, 194, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 194, 255, 0.3);
+        }
+
+        .file-name {
+            font-size: 0.85em;
+            color: #00c2ff;
+            background: rgba(110, 69, 226, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 8px;
+            flex-shrink: 0;
+            border: 1px solid rgba(110, 69, 226, 0.3);
+            box-shadow: 0 0 15px rgba(110, 69, 226, 0.3);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                height: 90vh;
+            }
+            
+            h2 {
+                font-size: 1.8em;
+                margin-bottom: 15px;
+            }
+            
+            .upload-area {
+                padding: 10px;
+            }
+            
+            .upload-area i {
+                font-size: 35px;
+            }
+            
+            .upload-area p {
+                font-size: 0.9em;
+            }
+            
+            button {
+                padding: 12px 25px;
+                width: 100%;
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>📄 OCR PDF Reader</h2>
+    
+    <form id="uploadForm">
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <i>📁</i>
+            <p>Glissez-déposez votre fichier PDF ici ou cliquez pour parcourir</p>
+            <div class="file-info">Formats supportés : PDF uniquement</div>
+            <input type="file" id="fileInput" accept="application/pdf" required />
+        </div>
+
+        <div class="button-container">
+            <button type="submit">🚀 Lancer l'extraction</button>
+        </div>
+    </form>
+
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <p>Extraction en cours...</p>
+    </div>
+
+    <div class="textarea-container">
+        <textarea id="resultText" placeholder="Le texte extrait de votre PDF apparaîtra ici..."></textarea>
+        <div class="char-count" id="charCount">0 caractères</div>
+    </div>
+    
+    <!-- Affichage du nom du fichier sélectionné -->
+    <div id="selectedFileName" class="file-name" style="display: none;"></div>
+</div>
+
+<script>
+// Gestion de l'affichage du nom du fichier sélectionné
+document.getElementById("fileInput").addEventListener("change", function(e) {
+    const fileNameDiv = document.getElementById("selectedFileName");
+    if (this.files.length > 0) {
+        fileNameDiv.textContent = `📎 ${this.files[0].name}`;
+        fileNameDiv.style.display = "inline-block";
+    } else {
+        fileNameDiv.style.display = "none";
+    }
+});
+
+document.getElementById("uploadForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById("fileInput");
+    
+    // Vérification qu'un fichier est sélectionné
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Veuillez sélectionner un fichier PDF");
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    // Afficher le loader et préparer l'interface
+    document.getElementById("loader").style.display = "block";
+    const resultTextarea = document.getElementById("resultText");
+    resultTextarea.value = "";
+    resultTextarea.placeholder = "Extraction en cours...";
+    
+    // Mise à jour du compteur de caractères
+    document.getElementById("charCount").textContent = "0 caractères";
+
+    try {
+        const response = await fetch("/upload-pdf/", {
+            method: "POST",
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Affichage du résultat avec une petite animation
+        resultTextarea.value = data.text || "Aucun texte extrait";
+        resultTextarea.placeholder = "Texte extrait avec succès !";
+        
+        // Mise à jour du compteur de caractères
+        const charCount = data.text ? data.text.length : 0;
+        document.getElementById("charCount").textContent = `${charCount} caractères`;
+        
+    } catch (error) {
+        console.error("Erreur:", error);
+        resultTextarea.value = "Une erreur est survenue lors de l'extraction. Veuillez réessayer.";
+        resultTextarea.placeholder = "Erreur d'extraction";
+        
+        // Animation d'erreur subtile
+        resultTextarea.style.borderColor = "#ff3366";
+        resultTextarea.style.boxShadow = "0 0 30px #ff3366";
+        setTimeout(() => {
+            resultTextarea.style.borderColor = "rgba(110, 69, 226, 0.3)";
+            resultTextarea.style.boxShadow = "inset 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(110, 69, 226, 0.2)";
+        }, 2000);
+        
+    } finally {
+        document.getElementById("loader").style.display = "none";
+    }
+});
+
+// Mise à jour du compteur de caractères en temps réel
+document.getElementById("resultText").addEventListener("input", function() {
+    const count = this.value.length;
+    document.getElementById("charCount").textContent = `${count} caractère${count > 1 ? 's' : ''}`;
+});
+</script>
+
+</body>
+</html>

@@ -1,16 +1,24 @@
 from fastapi import FastAPI, UploadFile, File
 from pdf2image import convert_from_path
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 import pytesseract
 from PIL import Image
 import os
 import re
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
 UPLOAD_FOLDER = "uploads"
 
 # Spécifique Windows
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload-pdf/")
 async def upload_pdf(file: UploadFile = File(...)):
